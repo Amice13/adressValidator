@@ -1,0 +1,9 @@
+{
+  "name": "",
+  "version": "",
+  "dependencies": {
+    "elasticsearch": "^14.2.2",
+    "fast-csv": "^2.4.1",
+    "fast-levenshtein": "^2.0.6"
+  }
+}
