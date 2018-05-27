@@ -8,115 +8,69 @@ module.exports.validate = async (address) => {
     if (!address.fullAddress) address.fullAddress = ''
     if (!address.source) address.source = ''
 
-    var lookupAddress = ''
-    if (address.postalCode) lookupAddress += address.postalCode + ' '
-    if (address.region) lookupAddress += '"' + address.region + '" '
-    if (address.district) lookupAddress += '"' + address.district + '" '
-    if (address.locality) lookupAddress += '"' + address.locality + '" '
-    if (address.streetAddress) lookupAddress += '"' + address.streetAddress + '" '
-
-    var body = []
-
-    if (address.postalCode) {
-      body = body.concat([
-        { index: 'drv', type: 'drv' },
-        {
-          'query': {
-            'bool': {
-              'must': {
-                'simple_query_string': {
-                'fields': ['all'],
-                'query': address.fullAddress,
-                'default_operator': 'or'
-                }
-              },
-              'filter': {
-                'match': {'postalCode': address.postalCode }
-              }
-            }
-          }
-        },
-        { index: 'drv', type: 'drv' },
-        {
-          'query': {
-            'bool': {
-              'must': {
-                'simple_query_string': {
-                'fields': ['all'],
-                'query': address.fullAddress,
-                'default_operator': 'or'
-                }
-              },
-              'filter': {
-                'match': {'postalCode': address.postalCode }
-              }
+    var queryAddress = {
+      'query': {
+        'bool': {
+          'must': {
+            'simple_query_string': {
+              'fields': ['all'],
+              'query': address.fullAddress,
+              'default_operator': 'or'
             }
           }
         }
-        ])
+      }
     }
 
-    body = body.concat([
-        { index: 'drv', type: 'drv' },
-        {
-          'query': {
-            'bool': {
-              'must': {
-                'simple_query_string': {
-                'fields': ['all.shingle'],
-                'query': address.fullAddress,
-                'default_operator': 'or'
-                }
-              }
-            }
-          }
-        },
-        { index: 'drv', type: 'drv' },
-        {
-          'query': {
-            'bool': {
-              'must': {
-                'simple_query_string': {
-                'fields': ['all'],
-                'query': address.fullAddress,
-                'default_operator': 'or'
-                }
-              }
-            }
-          }
-        },
-        { index: 'drv', type: 'drv' },
-        {
-          'query': {
-            'bool': {
-              'must': {
-                'simple_query_string': {
-                'fields': ['all'],
-                'query': address.fullAddress,
-                'default_operator': 'or'
-                }
-              }
-            }
-          }
-        },
-        { index: 'drv', type: 'drv' },
-        {
-          'query': {
-            'bool': {
-              'must': {
-                'simple_query_string': {
-                'fields': ['all'],
-                'query': lookupAddress,
-                'default_operator': 'or'
-                }
-              }
+    var queryAddressWithShingles = {
+      'query': {
+        'bool': {
+          'must': {
+            'simple_query_string': {
+              'fields': ['all.shingle'],
+              'query': address.fullAddress,
+              'default_operator': 'or'
             }
           }
         }
-        ])
+      }
+    }
 
+    var querySource = {
+      'query': {
+        'bool': {
+          'must': {
+            'simple_query_string': {
+              'fields': ['all'],
+              'query': address.fullAddress,
+              'default_operator': 'or'
+            }
+          }
+        }
+      }
+    }
 
-    var result = await client.msearch({body})
+    var should = []
+
+    if (address.postalCode) should.push({'match': {'postalCode': address.postalCode }})
+    if (address.region) should.push({'match': {'region': address.region }})
+
+    if (should.length) {
+      queryAddress.query.bool.should = should
+      queryAddressWithShingles.query.bool.should = should
+      querySource.query.bool.should = should
+    }
+
+    var queryBody = [
+      { index: 'drv', type: 'drv' },
+      queryAddress,
+      { index: 'drv', type: 'drv' },
+      queryAddressWithShingles,
+      { index: 'drv', type: 'drv' },
+      querySource
+    ]
+
+    var result = await client.msearch({ queryBody })
 
     var newAddress = {}
     var max_score = 0
@@ -185,8 +139,8 @@ module.exports.validate = async (address) => {
 
 var test = async () => {
   var res = await module.exports.validate({
-    'fullAddress': '24300, ВУЛ.ЛЕНІНА, БУД.31, СМТ.ТРОСТЯНЕЦЬ, ТРОСТЯНЕЦЬКИЙ РАЙОН, ВІННИЦЬКА ОБЛАСТЬ, УКРАЇНА',
-    'postalCode': '24300',
+    'fullAddress': '49000, ВУЛ.ЛЕНІНА, БУД.31, СМТ.ТРОСТЯНЕЦЬ, ТРОСТЯНЕЦЬКИЙ РАЙОН, ВІННИЦЬКА ОБЛАСТЬ, УКРАЇНА',
+    'postalCode': '49000',
     'region': 'Вінницька область',
     'district': 'Тростянецький район',
     'locality': 'селище міського типу Тростянець',
